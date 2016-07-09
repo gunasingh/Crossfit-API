@@ -1,9 +1,19 @@
 var express = require('express');
 var bodyParser = require('body-parser');
+var _ = require('underscore');
 
 var PORT = process.env.PORT || 3000;
 var app = express();
 var moves = [];
+var moveType = {
+	CARDIO: 1,
+	CORE: 2,
+	STRENGTH: 4,
+	ENDURANCE: 8,
+	GYMNASTIC: 16,
+	DEFAULT: 32
+}
+
 var nextMoveId = 1;
 
 app.use(bodyParser.json());
@@ -17,17 +27,11 @@ app.get('/', function (req, res) {
 app.get('/moves', function (req, res) {
 	res.json(moves);
 });
- 
+
 // GET /moves/:id
 app.get('/moves/:id', function (req, res) {
 	var moveId = parseInt(req.params.id, 10);
-	var matchedMove;
-
-	moves.forEach(function (move) {
-		if (move.id === moveId) {
-			matchedMove = move;
-		}
-	});
+	var matchedMove = _.findWhere(moves, {id: moveId});
 
 	if (matchedMove) {
 		res.json(matchedMove);
@@ -38,9 +42,19 @@ app.get('/moves/:id', function (req, res) {
 
 // POST /moves
 app.post('/moves', function (req, res) {
-	var body = req.body;
+	var body = _.pick(req.body, 'name', 'type');
+
+	if (!_.isString(body.name)
+		|| !_.isNumber(body.type)
+		|| body.name.trim().length === 0
+		|| body.type > moveType.DEFAULT) {
+		//Bad data
+		return res.status(400).send();
+	}
 
 	body.id = nextMoveId++;
+	body.name = body.name.trim();
+	body.type = body.type;
 	moves.push(body);
 	res.json(body);
 });
