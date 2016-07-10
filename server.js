@@ -59,6 +59,19 @@ app.post('/moves', function (req, res) {
 	res.json(body);
 });
 
+// DELETE /moves/:id
+app.delete('/moves/:id', function (req, res) {
+	var moveId = parseInt(req.params.id, 10);
+	var deleteMove = _.findWhere(moves, {id: moveId});
+
+	if (deleteMove) {
+		moves = _.without(moves, deleteMove);
+		res.json(deleteMove);
+	} else {
+		res.status(404).send();
+	}
+});
+
 // Start the server
 app.listen(PORT, function () {
 	console.log('Server listening on port ' + PORT + '!');
