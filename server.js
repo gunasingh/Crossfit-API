@@ -40,6 +40,39 @@ app.get('/moves/:id', function (req, res) {
 	}
 });
 
+// PUT /moves/:id
+app.put('/moves/:id', function (req, res) {
+	var moveId = parseInt(req.params.id, 10);
+	var matchedMove = _.findWhere(moves, {id: moveId});
+	var body = _.pick(req.body, 'name', 'type');
+	var validAttributes = {};
+
+	if (!matchedMove) {
+		return res.status(404).send();
+	}
+
+	if (body.hasOwnProperty('name') && _.isString(body.name)
+			&& body.name.trim().length > 0) {
+		validAttributes.name = body.name;
+	} else if (body.hasOwnProperty('name')) {
+		return res.status(400).send();
+	} else {
+		// No name attribute provided. No name to update.
+	}
+
+	if (body.hasOwnProperty('type') && _.isNumber(body.type)) {
+		validAttributes.type = body.type;
+	} else if (body.hasOwnProperty('type')) {
+		return res.status(400).send();
+	} else {
+		// No type attribute privided. No type to  update.
+	}
+
+	// Update matched move with the provided valid attributes.
+	_.extend(matchedMove, validAttributes);
+	res.json(matchedMove);
+});
+
 // POST /moves
 app.post('/moves', function (req, res) {
 	var body = _.pick(req.body, 'name', 'type');
