@@ -22,7 +22,7 @@ app.get('/', function (req, res) {
 	res.send('Crossfit API root!');
 });
 
-// GET /moves
+// GET /moves?type=cardio&q=run
 app.get('/moves', function (req, res) {
 	var queryParams = req.query;
 	var filteredMoves = moves;
@@ -31,6 +31,16 @@ app.get('/moves', function (req, res) {
 			&& _.contains(moveType, queryParams.type)) {
 		filteredMoves = _.where(filteredMoves,
 			{type: queryParams.type.trim().toLowerCase()});
+	}
+
+	if (queryParams.hasOwnProperty('q')
+			&& queryParams.q.trim().length > 0) {
+		filteredMoves = _.filter(filteredMoves, function (move) {
+			if (move.name.toLowerCase().indexOf(queryParams.q.trim().toLowerCase()) > -1) {
+				return true;
+			}
+			return false;
+		});
 	}
 
 	res.json(filteredMoves);
