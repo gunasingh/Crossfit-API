@@ -5,14 +5,13 @@ var _ = require('underscore');
 var PORT = process.env.PORT || 3000;
 var app = express();
 var moves = [];
-var moveType = {
-	CARDIO: 1,
-	CORE: 2,
-	STRENGTH: 4,
-	ENDURANCE: 8,
-	GYMNASTIC: 16,
-	DEFAULT: 32
-}
+var moveType = [
+	'cardio',
+	'core',
+	'strength',
+	'endurance',
+	'gymnastic'
+];
 
 var nextMoveId = 1;
 
@@ -28,9 +27,10 @@ app.get('/moves', function (req, res) {
 	var queryParams = req.query;
 	var filteredMoves = moves;
 
-	if (queryParams.hasOwnProperty('type')) {
-		var type = parseInt(queryParams.type, 10);
-		filteredMoves = _.where(filteredMoves, {type: type});
+	if (queryParams.hasOwnProperty('type')
+			&& _.contains(moveType, queryParams.type)) {
+		filteredMoves = _.where(filteredMoves,
+			{type: queryParams.type.trim().toLowerCase()});
 	}
 
 	res.json(filteredMoves);
@@ -68,7 +68,9 @@ app.put('/moves/:id', function (req, res) {
 		// No name attribute provided. No name to update.
 	}
 
-	if (body.hasOwnProperty('type') && _.isNumber(body.type)) {
+	if (body.hasOwnProperty('type') && _.isString(body.type)
+			&& body.type.trim().length > 0
+			&& _.contains(moveType, body.type.trim().toLowerCase())) {
 		validAttributes.type = body.type;
 	} else if (body.hasOwnProperty('type')) {
 		return res.status(400).send();
@@ -86,16 +88,16 @@ app.post('/moves', function (req, res) {
 	var body = _.pick(req.body, 'name', 'type');
 
 	if (!_.isString(body.name)
-		|| !_.isNumber(body.type)
+		|| !_.isString(body.type)
 		|| body.name.trim().length === 0
-		|| body.type > moveType.DEFAULT) {
+		|| !_.contains(moveType, body.type.trim().toLowerCase())) {
 		//Bad data
 		return res.status(400).send();
 	}
 
 	body.id = nextMoveId++;
 	body.name = body.name.trim();
-	body.type = body.type;
+	body.type = body.type.trim().toLowerCase();
 	moves.push(body);
 	res.json(body);
 });
