@@ -25,7 +25,15 @@ app.get('/', function (req, res) {
 
 // GET /moves
 app.get('/moves', function (req, res) {
-	res.json(moves);
+	var queryParams = req.query;
+	var filteredMoves = moves;
+
+	if (queryParams.hasOwnProperty('type')) {
+		var type = parseInt(queryParams.type, 10);
+		filteredMoves = _.where(filteredMoves, {type: type});
+	}
+
+	res.json(filteredMoves);
 });
 
 // GET /moves/:id
