@@ -1,6 +1,7 @@
 var express = require('express');
 var bodyParser = require('body-parser');
 var _ = require('underscore');
+var db = require('./db.js');
 
 var PORT = process.env.PORT || 3000;
 var app = express();
@@ -24,73 +25,72 @@ app.get('/', function (req, res) {
 
 // GET /moves?type=cardio&q=run
 app.get('/moves', function (req, res) {
-	var queryParams = req.query;
-	var filteredMoves = moves;
+	var query = req.query;
+	var where = {};
 
-	if (queryParams.hasOwnProperty('type')
-			&& _.contains(moveType, queryParams.type)) {
-		filteredMoves = _.where(filteredMoves,
-			{type: queryParams.type.trim().toLowerCase()});
+	if (query.hasOwnProperty('type') && query.type.length > 0
+			&& _.contains(moveType, query.type)) {
+		where.type = {
+			$like: query.type
+		};
 	}
 
-	if (queryParams.hasOwnProperty('q')
-			&& queryParams.q.trim().length > 0) {
-		filteredMoves = _.filter(filteredMoves, function (move) {
-			if (move.name.toLowerCase().indexOf(queryParams.q.trim().toLowerCase()) > -1) {
-				return true;
-			}
-			return false;
-		});
+	if (query.hasOwnProperty('q') && query.q.length > 0) {
+		where.name = {
+			$like: '%' + query.q + '%'
+		};
 	}
 
-	res.json(filteredMoves);
+	db.move.findAll({where: where}).then(function (moves) {
+		res.json(moves);
+	}, function (e) {
+		res.status(500).send();
+	});
 });
 
 // GET /moves/:id
 app.get('/moves/:id', function (req, res) {
 	var moveId = parseInt(req.params.id, 10);
-	var matchedMove = _.findWhere(moves, {id: moveId});
 
-	if (matchedMove) {
-		res.json(matchedMove);
-	} else {
-		res.status(404).send();
-	}
+	db.move.findById(moveId).then(function (move) {
+		if (!!move) {
+			res.json(move.toJSON());
+		} else {
+			res.status(404).send();
+		}
+	}, function (e) {
+		res.status(500).send();
+	});
 });
 
 // PUT /moves/:id
 app.put('/moves/:id', function (req, res) {
 	var moveId = parseInt(req.params.id, 10);
-	var matchedMove = _.findWhere(moves, {id: moveId});
+
 	var body = _.pick(req.body, 'name', 'type');
-	var validAttributes = {};
+	var attributes = {};
 
-	if (!matchedMove) {
-		return res.status(404).send();
+	if (body.hasOwnProperty('type') && _.contains(moveType, body.type)) {
+		attributes.type = body.type;
 	}
 
-	if (body.hasOwnProperty('name') && _.isString(body.name)
-			&& body.name.trim().length > 0) {
-		validAttributes.name = body.name;
-	} else if (body.hasOwnProperty('name')) {
-		return res.status(400).send();
-	} else {
-		// No name attribute provided. No name to update.
+	if (body.hasOwnProperty('name')) {
+		attributes.name = body.name;
 	}
 
-	if (body.hasOwnProperty('type') && _.isString(body.type)
-			&& body.type.trim().length > 0
-			&& _.contains(moveType, body.type.trim().toLowerCase())) {
-		validAttributes.type = body.type;
-	} else if (body.hasOwnProperty('type')) {
-		return res.status(400).send();
-	} else {
-		// No type attribute privided. No type to  update.
-	}
-
-	// Update matched move with the provided valid attributes.
-	_.extend(matchedMove, validAttributes);
-	res.json(matchedMove);
+	db.move.findById(moveId).then(function (move) {
+		if (move) {
+			move.update(attributes).then(function (move) {
+				res.json(move.toJSON());
+			}, function (e) {
+				res.status(400).json(e);
+			});
+		} else {
+			res.status(404).send();
+		}
+	}, function () {
+		res.status(500).send();
+	});
 });
 
 // POST /moves
@@ -105,27 +105,37 @@ app.post('/moves', function (req, res) {
 		return res.status(400).send();
 	}
 
-	body.id = nextMoveId++;
-	body.name = body.name.trim();
-	body.type = body.type.trim().toLowerCase();
-	moves.push(body);
-	res.json(body);
+	db.move.create(body).then(function (move) {
+		res.json(move.toJSON());
+	}).catch(function (e) {
+		res.status(400).json(e);
+	});
 });
 
 // DELETE /moves/:id
 app.delete('/moves/:id', function (req, res) {
 	var moveId = parseInt(req.params.id, 10);
-	var deleteMove = _.findWhere(moves, {id: moveId});
 
-	if (deleteMove) {
-		moves = _.without(moves, deleteMove);
-		res.json(deleteMove);
-	} else {
-		res.status(404).send();
-	}
+	db.move.destroy({
+		where: {
+			id: moveId
+		}
+	}).then(function (rowsDeleted) {
+		if (rowsDeleted === 0) {
+			res.status(404).json({
+				error: 'No move with id'
+			});
+		} else {
+			res.status(204).send();
+		}
+	}, function () {
+		res.status(500).send();
+	});
 });
 
 // Start the server
-app.listen(PORT, function () {
-	console.log('Server listening on port ' + PORT + '!');
+db.sequelize.sync().then(function () {
+	app.listen(PORT, function () {
+		console.log('Server listening on port ' + PORT + '!');
+	});
 });
