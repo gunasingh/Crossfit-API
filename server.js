@@ -3,6 +3,7 @@ var bodyParser = require('body-parser');
 var _ = require('underscore');
 var db = require('./db.js');
 var bcrypt = require('bcrypt');
+var middleware = require('./middleware.js')(db);
 
 var PORT = process.env.PORT || 3000;
 var app = express();
@@ -25,7 +26,7 @@ app.get('/', function (req, res) {
 });
 
 // GET /moves?type=cardio&q=run
-app.get('/moves', function (req, res) {
+app.get('/moves', middleware.requireAuthentication, function (req, res) {
 	var query = req.query;
 	var where = {};
 
@@ -50,7 +51,7 @@ app.get('/moves', function (req, res) {
 });
 
 // GET /moves/:id
-app.get('/moves/:id', function (req, res) {
+app.get('/moves/:id', middleware.requireAuthentication, function (req, res) {
 	var moveId = parseInt(req.params.id, 10);
 
 	db.move.findById(moveId).then(function (move) {
@@ -65,7 +66,7 @@ app.get('/moves/:id', function (req, res) {
 });
 
 // PUT /moves/:id
-app.put('/moves/:id', function (req, res) {
+app.put('/moves/:id', middleware.requireAuthentication, function (req, res) {
 	var moveId = parseInt(req.params.id, 10);
 
 	var body = _.pick(req.body, 'name', 'type');
@@ -95,7 +96,7 @@ app.put('/moves/:id', function (req, res) {
 });
 
 // POST /moves
-app.post('/moves', function (req, res) {
+app.post('/moves', middleware.requireAuthentication, function (req, res) {
 	var body = _.pick(req.body, 'name', 'type');
 
 	if (!_.isString(body.name)
@@ -114,7 +115,7 @@ app.post('/moves', function (req, res) {
 });
 
 // DELETE /moves/:id
-app.delete('/moves/:id', function (req, res) {
+app.delete('/moves/:id', middleware.requireAuthentication, function (req, res) {
 	var moveId = parseInt(req.params.id, 10);
 
 	db.move.destroy({
@@ -150,7 +151,12 @@ app.post('/users/login', function (req, res) {
 	var body = _.pick(req.body, 'email', 'password');
 
 	db.user.authenticate(body).then(function (user) {
-		res.json(user.toPublicJSON());
+		var token = user.generateToken('authentication');
+		if (token) {
+			res.header('Auth', token).json(user.toPublicJSON());
+		} else {
+			res.status(401).send();
+		}
 	}, function () {
 		// Unable to authenticate using password.
 		res.status(401).send();
@@ -159,7 +165,7 @@ app.post('/users/login', function (req, res) {
 
 // Start the server
 db.sequelize.sync({
-	//force: true
+	force: true
 	}).then(function () {
 	app.listen(PORT, function () {
 		console.log('Server listening on port ' + PORT + '!');
